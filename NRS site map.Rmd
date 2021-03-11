@@ -1,0 +1,345 @@
+---
+title: "NRS sitemap"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    toc_depth: 4
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, out.width = '100%')
+
+library(readxl)
+library(networkD3)
+library(tidygraph)
+library(ggraph)
+library(stringr)
+library(here)
+library(plotly)
+library(dplyr)
+library(purrr)
+
+
+# Read data ---------------------------------------------------------------
+site_map <- read_excel(path = here("NRS site map - 2021-01-26.xlsm"),
+                       sheet = "sitemap") %>%
+  distinct()
+
+get_children <- function(df) {
+  if (nrow(df) == 1)
+    return(NULL)
+  else {
+    df_trimmed <- select(df, -1)
+    children <- split(df_trimmed, f = select(df_trimmed, 1))
+    names(children) <- NULL # Remove names to create the format networkD3 needs
+    return(children)
+  }
+}
+
+create_list <- function(df) {
+  # Recursively traverse the site map
+  if (nrow(df) != 1)
+    list(name = df[[1]][[1]],
+         children = lapply(X = get_children(df), FUN = create_list))
+  else
+    list(name = df[[1]][[1]])
+}
+
+site_map_list <- create_list(site_map)
+
+# Turn this into a generic function
+site_map_list_plots <-
+  lapply(site_map_list[["children"]], radialNetwork)
+names(site_map_list_plots) <-
+  map(site_map_list[["children"]], "name")
+
+site_map_list_stats_1 <-
+  keep(
+    site_map_list[["children"]],
+    .p = function(x)
+      x[["name"]] == "statistics-and-data"
+  ) %>%
+  `[[`(1) %>%
+  `[[`("children")
+
+site_map_list_stats_1_plots <-
+  lapply(site_map_list_stats_1, radialNetwork)
+names(site_map_list_stats_1_plots) <-
+  map(site_map_list_stats_1, "name")
+
+site_map_list_stats_1 <-
+  keep(
+    site_map_list[["children"]],
+    .p = function(x)
+      x[["name"]] == "statistics-and-data"
+  )
+
+
+
+# Define sections of the website ------------------------------------------
+
+vital_events_improvements <- site_map_list[["children"]][[1]]
+about_us <- site_map_list[["children"]][[2]]
+copyright <- site_map_list[["children"]][[3]]
+declaration <- site_map_list[["children"]][[4]]
+events <-  site_map_list[["children"]][[5]]
+news <- site_map_list[["children"]][[6]]
+record_keeping <- site_map_list[["children"]][[7]]
+registration <- site_map_list[["children"]][[8]]
+research <- site_map_list[["children"]][[9]]
+stats <- site_map_list[["children"]][[10]]
+
+stats_future_census <- stats[["children"]][[1]]
+stats_census <- stats[["children"]][[2]]
+stats_enquiries <- stats[["children"]][[3]]
+stats_future_pubs <- stats[["children"]][[4]]
+stats_geography <- stats[["children"]][[5]]
+stats_indexing <- stats[["children"]][[6]]
+stats_nhs_central <- stats[["children"]][[7]]
+stats_sls <- stats[["children"]][[8]]
+stats_stats <- stats[["children"]][[9]]
+
+stats_stats_about <- stats_stats[["children"]][[1]]
+stats_stats_scot_facts <- stats_stats[["children"]][[2]]
+stats_stats_services <- stats_stats[["children"]][[3]]
+stats_stats_az <- stats_stats[["children"]][[4]]
+stats_stats_theme <- stats_stats[["children"]][[5]]
+stats_stats_related <- stats_stats[["children"]][[6]]
+stats_stats_glance <- stats_stats[["children"]][[7]]
+stats_stats_user_consultation <- stats_stats[["children"]][[8]]
+stats_stats_user_consultations <- stats_stats[["children"]][[9]]
+
+stats_stats_theme_electoral <- stats_stats_theme[["children"]][[1]]
+stats_stats_theme_households <- stats_stats_theme[["children"]][[2]]
+stats_stats_theme_housholds <- stats_stats_theme[["children"]][[3]]
+stats_stats_theme_life_exp <- stats_stats_theme[["children"]][[4]]
+stats_stats_theme_migration <- stats_stats_theme[["children"]][[5]]
+stats_stats_theme_population <- stats_stats_theme[["children"]][[6]]
+stats_stats_theme_vital_events <- stats_stats_theme[["children"]][[7]]
+
+# Plot sitemap ------------------------------------------------------------
+pages <- data.frame(
+  id = 1:35,
+  label = c("Home",
+            
+            "vital events improvements",
+            "about us",
+            "copyright",
+            "declaration",
+            "news",
+            "record keeping",
+            "registration",
+            "research",
+            "statistics and data",
+            
+            "beyond 2011 the future of census statistics",
+            "census",
+            "enquiries",
+            "future pubs",
+            "geography",
+            "national records of scotland indexing team",
+            "nhs central register",
+            "scottish longitudinal study sls",
+            "statistics",
+            
+            "about our statistics",
+            "scotlands facts",
+            "statistical service in scotland",
+            "statistics a-z",
+            "statistics related links",
+            "stats at a glance",
+            "user consultation groups and seminars",
+            "user consultations groups and seminars",
+            "statistics by theme",
+            
+            "electoral statistics",
+            "households",
+            "housholds",
+            "life expectancy",
+            "migration",
+            "population",
+            "vital events"
+  ),
+  children = c(2791,
+               1, 17, 1, 1, 239, 106, 30, 541, 1856,
+               18, 125, 1, 2, 87, 2, 36, 5, 1579,
+               20, 10, 1, 1, 1, 166, 1, 140, 1238,
+               38, 37, 147, 105, 19, 388, 503
+  )
+)
+
+links <- data.frame(
+  from = c(rep(1, 9),
+           rep(10, 9),
+           rep(19, 9),
+           rep(28, 7)),
+  to = c(2:10,
+         11:19,
+         20:28,
+         29:35)
+)
+
+site_map_graph <- tbl_graph(nodes = pages,
+                            edges = links)
+
+site_map_plot <- ggraph(site_map_graph, layout = "tree") +
+  geom_edge_diagonal(colour = "#84329b") +
+  geom_node_point(mapping = aes(size = children),
+                  colour = "#84329b",
+                  alpha = 0.9) +
+  geom_node_label(mapping = aes(label = label),
+                  size = 3,
+                  alpha = 0.3,
+                  hjust = 0) +
+  scale_size_continuous(range = c(1,50)) +
+  scale_y_continuous(expand = c(0.15, 0), trans = "reverse") +
+  scale_x_reverse() +
+  coord_flip() +
+  theme(
+    legend.position = "none",
+    panel.background = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title = element_blank()
+  )
+```
+
+These charts were made to help understand how **nrscotland.gov.uk** is organised and to make improvements. Charts are based on the sitemap from 26 January 2021.
+
+## The whole website
+
+Each circle is a web page. The size of each circle means the number of children that web page has. So the home page is the biggest circle because all the other web pages are organised underneath the home page. Some of the smallest circles (e.g. vital events improvements) have no children.
+
+```{r fig.height=10}
+site_map_plot
+```
+
+## Sections of the website
+
+Each dot represents a single web page. Hover over a dot to increase the text size. Sections with no children aren't included (e.g. vital events improvements).
+
+### Home
+
+#### About us
+```{r}
+radialNetwork(about_us)
+```
+
+#### News
+```{r}
+radialNetwork(news)
+```
+
+#### Record keeping
+```{r}
+radialNetwork(record_keeping)
+```
+
+#### Registration
+```{r}
+radialNetwork(registration)
+```
+
+#### Research
+```{r}
+radialNetwork(research)
+```
+
+### Statistics and Data
+
+#### Beyond 2011 the future of census statistics
+```{r}
+radialNetwork(stats_future_census)
+```
+
+#### Census
+```{r}
+radialNetwork(stats_census)
+```
+
+#### Future publications
+```{r}
+radialNetwork(stats_future_pubs)
+```
+
+#### Geography
+```{r}
+radialNetwork(stats_geography)
+```
+
+#### Indexing
+```{r}
+radialNetwork(stats_indexing)
+```
+
+#### NHS central register
+```{r}
+radialNetwork(stats_nhs_central)
+```
+
+#### Scottish Longitudinal Study
+```{r}
+radialNetwork(stats_sls)
+```
+
+#### Indexing
+```{r}
+radialNetwork(stats_indexing)
+```
+
+### Statistics
+
+#### About our statistics
+```{r}
+radialNetwork(stats_stats_about)
+```
+
+#### Scotland's facts
+```{r}
+radialNetwork(stats_stats_scot_facts)
+```
+
+#### Stats at a glance
+```{r}
+radialNetwork(stats_stats_glance)
+```
+
+### Statistics by theme
+
+#### Electoral statistics
+```{r}
+radialNetwork(stats_stats_theme_electoral)
+```
+
+#### Households
+```{r}
+radialNetwork(stats_stats_theme_households)
+```
+
+#### Housholds
+```{r}
+radialNetwork(stats_stats_theme_housholds)
+```
+
+#### Life expectancy
+```{r}
+radialNetwork(stats_stats_theme_life_exp)
+```
+
+#### Migration
+```{r}
+radialNetwork(stats_stats_theme_migration)
+```
+
+#### Population
+```{r}
+radialNetwork(stats_stats_theme_population)
+```
+
+#### Vital Events
+```{r}
+radialNetwork(stats_stats_theme_vital_events)
+```
+
+
